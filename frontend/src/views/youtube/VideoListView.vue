@@ -72,12 +72,12 @@
                 <v-skeleton-loader type="table-row@10"></v-skeleton-loader>
               </template>
               <template v-slot:[`item.title`]="{ item }">
-                <a
-                  :href="item.video_url"
-                  target="_blank"
+                <router-link
+                  :to="{ name: 'video-detail', params: { id: item.id } }"
                   class="text-decoration-none font-weight-medium"
-                  >{{ item.title }}</a
                 >
+                  {{ item.title }}
+                </router-link>
               </template>
               <template v-slot:[`item.created_at`]="{ item }">
                 <span>{{ formatDateTime(item.created_at) }}</span>

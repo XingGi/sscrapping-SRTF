@@ -1,11 +1,13 @@
 # core/urls.py
 
 from django.urls import path
-from .views import VideoListAPIView, CommentListAPIView, start_youtube_scrape, start_comment_scrape
+from .views import VideoListAPIView, CommentListAPIView, start_youtube_scrape, start_comment_scrape, VideoDetailAPIView, VideoCommentsListAPIView
 
 urlpatterns = [
     path('videos/', VideoListAPIView.as_view(), name='video-list'),
     path('comments/', CommentListAPIView.as_view(), name='comment-list'),
     path('scrape/youtube/', start_youtube_scrape, name='scrape-youtube'),
     path('scrape/comments/', start_comment_scrape, name='scrape-comments'),
+    path('videos/<int:pk>/', VideoDetailAPIView.as_view(), name='video-detail'),
+    path('videos/<int:video_id>/comments/', VideoCommentsListAPIView.as_view(), name='video-comments-list'),
 ]

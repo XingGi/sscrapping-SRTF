@@ -62,3 +62,20 @@ def start_comment_scrape(request):
         {'status': 'success', 'message': "Proses update komentar telah dimulai di latar belakang."},
         status=status.HTTP_202_ACCEPTED
     )
+    
+class VideoDetailAPIView(generics.RetrieveAPIView):
+    """
+    API view untuk mengambil detail satu video berdasarkan ID-nya.
+    """
+    queryset = Video.objects.all()
+    serializer_class = VideoSerializer
+
+class VideoCommentsListAPIView(generics.ListAPIView):
+    """
+    API view untuk mengambil semua komentar milik satu video spesifik.
+    """
+    serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        video_id = self.kwargs['video_id']
+        return Comment.objects.filter(video_id=video_id)
