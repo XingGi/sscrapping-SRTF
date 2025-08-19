@@ -2,8 +2,30 @@
   <v-container fluid>
     <v-row>
       <v-col cols="12">
-        <h1 class="text-h4 font-weight-bold mb-1">YouTube Scraper</h1>
-        <p class="text-medium-emphasis">A collection of scraped videos from YouTube.</p>
+        <v-card class="mb-6 elevation-2">
+          <v-card-title>Control Panel</v-card-title>
+          <v-card-text class="d-flex flex-column flex-md-row ga-4">
+            <v-text-field
+              v-model="scrapeKeyword"
+              label="Masukkan Keyword YouTube"
+              variant="outlined"
+              density="compact"
+              hide-details
+              placeholder="contoh: belajar django"
+              @keyup.enter="startScrape"
+            ></v-text-field>
+            <v-btn
+              @click="startScrape"
+              :loading="isScraping"
+              :disabled="!scrapeKeyword || isScraping"
+              color="primary"
+              size="large"
+              prepend-icon="mdi-magnify-scan"
+            >
+              Mulai Scrape
+            </v-btn>
+          </v-card-text>
+        </v-card>
       </v-col>
     </v-row>
 
@@ -25,7 +47,6 @@
               style="max-width: 320px"
             ></v-text-field>
           </v-card-title>
-
           <v-divider></v-divider>
 
           <div class="desktop-only">
@@ -41,21 +62,17 @@
               <template v-slot:loading>
                 <v-skeleton-loader type="table-row@10"></v-skeleton-loader>
               </template>
-
               <template v-slot:[`item.title`]="{ item }">
                 <a
                   :href="item.video_url"
                   target="_blank"
                   class="text-decoration-none font-weight-medium"
+                  >{{ item.title }}</a
                 >
-                  {{ item.title }}
-                </a>
               </template>
-
               <template v-slot:[`item.created_at`]="{ item }">
                 <span>{{ formatDateTime(item.created_at) }}</span>
               </template>
-
               <template v-slot:[`item.video_url`]="{ item }">
                 <a :href="item.video_url" target="_blank" class="text-decoration-none">
                   <v-icon size="small">mdi-open-in-new</v-icon>
@@ -63,7 +80,6 @@
               </template>
             </v-data-table>
           </div>
-
           <div class="mobile-only">
             <v-list lines="three" class="pa-0">
               <div v-for="(item, index) in filteredVideos" :key="item.id || `video-${index}`">
@@ -80,31 +96,27 @@
               </div>
             </v-list>
           </div>
-
-          <template v-if="isLoading && videos.length === 0">
-            <v-skeleton-loader type="list-item-two-line@10"></v-skeleton-loader>
-          </template>
-          <div v-if="!isLoading && videos.length === 0" class="pa-4 text-center">
-            <v-alert type="warning">No video data found. Please run the scraper.</v-alert>
-          </div>
         </v-card>
       </v-col>
     </v-row>
+
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="4000">
+      {{ snackbar.text }}
+    </v-snackbar>
   </v-container>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
-// import { useVuetify } from 'vuetify' // <-- DIHAPUS, TIDAK DIPERLUKAN LAGI
 
-// State Management
+const scrapeKeyword = ref('')
+const isScraping = ref(false)
+const snackbar = ref({ show: false, text: '', color: 'success' })
 const search = ref('')
 const videos = ref([])
 const isLoading = ref(true)
-// const vuetify = useVuetify() // <-- DIHAPUS, TIDAK DIPERLUKAN LAGI
 
-// Konfigurasi Tabel untuk Desktop
 const headers = [
   { title: 'Video Title', key: 'title', width: '40%' },
   { title: 'Channel Name', key: 'channel_name', width: '30%' },
@@ -112,34 +124,44 @@ const headers = [
   { title: 'Link', key: 'video_url', sortable: false, align: 'center', width: '10%' },
 ]
 
-// Computed property untuk filter di mobile
-const filteredVideos = computed(() => {
-  if (!search.value) {
-    return videos.value
-  }
-  return videos.value.filter(
-    (video) =>
-      video.title.toLowerCase().includes(search.value.toLowerCase()) ||
-      video.channel_name.toLowerCase().includes(search.value.toLowerCase()),
-  )
-})
+const startScrape = async () => {
+  if (!scrapeKeyword.value) return
+  isScraping.value = true
+  snackbar.value = { show: false, text: '' }
+  try {
+    const response = await axios.post('http://127.0.0.1:8000/api/scrape/youtube/', {
+      keyword: scrapeKeyword.value,
+    })
+    snackbar.value = { show: true, text: response.data.message, color: 'success' }
+    scrapeKeyword.value = ''
 
-// Fungsi untuk memformat tanggal
-const formatDateTime = (isoString) => {
-  if (!isoString) return 'N/A'
-  const date = new Date(isoString)
-  return date.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' })
+    // --- FITUR AUTO-REFRESH ---
+    // Tunggu beberapa detik untuk memberi waktu scraper bekerja, lalu refresh data
+    setTimeout(() => {
+      snackbar.value = { show: true, text: 'Refreshing data...', color: 'info' }
+      fetchVideos()
+    }, 5000) // Tunggu 5 detik sebelum refresh
+  } catch (error) {
+    console.error('Error starting scrape job:', error)
+    snackbar.value = { show: true, text: 'Failed to start scraping job.', color: 'error' }
+  } finally {
+    isScraping.value = false
+  }
 }
 
-// Logika Pengambilan Data
-onMounted(async () => {
+const fetchVideos = async () => {
   isLoading.value = true
   try {
     const response = await axios.get('http://127.0.0.1:8000/api/videos/')
+
+    // --- PERBAIKAN BUG API ---
+    // Logika ini sekarang menangani kedua jenis respons (array langsung atau objek)
     if (Array.isArray(response.data)) {
       videos.value = response.data
     } else if (response.data && Array.isArray(response.data.results)) {
       videos.value = response.data.results
+    } else {
+      videos.value = [] // Fallback jika format tidak dikenali
     }
   } catch (error) {
     console.error('CRITICAL ERROR fetching video data:', error)
@@ -147,7 +169,24 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return 'N/A'
+  const date = new Date(isoString)
+  return date.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' })
+}
+
+const filteredVideos = computed(() => {
+  if (!search.value) return videos.value
+  return videos.value.filter(
+    (video) =>
+      video.title.toLowerCase().includes(search.value.toLowerCase()) ||
+      video.channel_name.toLowerCase().includes(search.value.toLowerCase()),
+  )
 })
+
+onMounted(fetchVideos)
 </script>
 
 <style scoped>
@@ -157,8 +196,6 @@ onMounted(async () => {
 .mobile-only {
   display: none;
 }
-
-/* Aturan untuk layar kecil (mobile) */
 @media (max-width: 960px) {
   .desktop-only {
     display: none;
