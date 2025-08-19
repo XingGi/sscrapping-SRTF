@@ -24,6 +24,15 @@
             >
               Mulai Scrape
             </v-btn>
+            <v-btn
+              @click="startCommentUpdate"
+              :loading="isUpdatingComments"
+              color="teal"
+              size="large"
+              prepend-icon="mdi-comment-sync"
+            >
+              Update Komentar
+            </v-btn>
           </v-card-text>
         </v-card>
       </v-col>
@@ -185,6 +194,32 @@ const filteredVideos = computed(() => {
       video.channel_name.toLowerCase().includes(search.value.toLowerCase()),
   )
 })
+
+const isUpdatingComments = ref(false)
+
+const startCommentUpdate = async () => {
+  isUpdatingComments.value = true
+  snackbar.value = { show: false, text: '' }
+  try {
+    const response = await axios.post('http://127.0.0.1:8000/api/scrape/comments/')
+    snackbar.value = { show: true, text: response.data.message, color: 'success' }
+
+    // Refresh halaman 'Sumber Data' setelah beberapa saat
+    setTimeout(() => {
+      // Di sini kita bisa menambahkan logika untuk auto-refresh halaman komentar jika diperlukan
+      snackbar.value = {
+        show: true,
+        text: 'Cek halaman Sumber Data untuk hasilnya.',
+        color: 'info',
+      }
+    }, 5000)
+  } catch (error) {
+    console.error('Error starting comment update job:', error)
+    snackbar.value = { show: true, text: 'Gagal memulai update komentar.', color: 'error' }
+  } finally {
+    isUpdatingComments.value = false
+  }
+}
 
 onMounted(fetchVideos)
 </script>

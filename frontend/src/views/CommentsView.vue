@@ -2,8 +2,8 @@
   <v-container fluid>
     <v-row>
       <v-col cols="12">
-        <h1 class="text-h4 font-weight-bold mb-1">Sumber Data Komentar</h1>
-        <p class="text-medium-emphasis">Kumpulan semua komentar dari berbagai sumber.</p>
+        <h1 class="text-h4 font-weight-bold mb-1">Sumber Data</h1>
+        <p class="text-medium-emphasis">Kumpulan semua komentar dari berbagai platform.</p>
       </v-col>
     </v-row>
 
@@ -11,12 +11,12 @@
       <v-col cols="12">
         <v-card class="elevation-2">
           <v-card-title class="d-flex flex-column flex-md-row align-center pa-4">
-            <span class="text-h6">Daftar Komentar</span>
+            <span class="text-h6">Semua Komentar</span>
             <v-spacer></v-spacer>
             <v-text-field
               v-model="search"
               density="compact"
-              label="Cari komentar, username, atau judul video..."
+              label="Cari komentar atau username..."
               prepend-inner-icon="mdi-magnify"
               variant="outlined"
               flat
@@ -42,11 +42,19 @@
             </template>
 
             <template v-slot:[`item.text`]="{ item }">
-              <div class="text-truncate" style="max-width: 400px">{{ item.text }}</div>
+              <div class="text-truncate" style="max-width: 350px" :title="item.text">
+                {{ item.text }}
+              </div>
             </template>
 
-            <template v-slot:[`item.created_at`]="{ item }">
-              <span>{{ formatDateTime(item.created_at) }}</span>
+            <template v-slot:[`item.platform`]="{ item }">
+              <v-chip :color="getPlatformColor(item.platform)" size="small">
+                {{ item.platform }}
+              </v-chip>
+            </template>
+
+            <template v-slot:[`item.scraped_at`]="{ item }">
+              <span>{{ formatDateTime(item.scraped_at) }}</span>
             </template>
 
             <template v-slot:[`item.comment_url`]="{ item }">
@@ -75,11 +83,19 @@ const comments = ref([])
 const isLoading = ref(true)
 
 const headers = [
-  { title: 'Username', key: 'username', width: '20%' },
-  { title: 'Isi Komentar', key: 'text', width: '50%' },
-  { title: 'Tanggal', key: 'created_at', width: '20%' },
+  { title: 'Username', key: 'username', width: '15%' },
+  { title: 'Isi Komentar', key: 'text', width: '45%' },
+  { title: 'Tanggal Scrape', key: 'scraped_at', width: '20%' },
+  { title: 'Platform', key: 'platform', align: 'center', width: '10%' },
   { title: 'Link', key: 'comment_url', sortable: false, align: 'center', width: '10%' },
 ]
+
+const getPlatformColor = (platform) => {
+  if (platform === 'YT') return 'red'
+  if (platform === 'IG') return 'pink'
+  if (platform === 'TT') return 'blue-grey'
+  return 'grey'
+}
 
 const formatDateTime = (isoString) => {
   if (!isoString) return 'N/A'

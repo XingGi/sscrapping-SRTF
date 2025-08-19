@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from dateutil.parser import parse as date_parse
 
 from core.models import Video, Comment
 
@@ -68,19 +69,34 @@ class Command(BaseCommand):
                         try:
                             username = element.find_element(By.ID, "author-text").text
                             text = element.find_element(By.ID, "content-text").text
-                            comment_url_element = element.find_element(By.CSS_SELECTOR, "a.yt-simple-endpoint")
+                            
+                            # --- LOGIKA BARU UNTUK MENGAMBIL TANGGAL & URL ---
+                            header_element = element.find_element(By.CSS_SELECTOR, "div#header-author")
+                            comment_url_element = header_element.find_element(By.CSS_SELECTOR, "a.yt-simple-endpoint")
                             comment_url = comment_url_element.get_attribute('href')
-
+                            
+                            # Mengambil teks tanggal seperti "3 days ago" atau "1 year ago"
+                            date_text = comment_url_element.text.strip()
+                            
+                            # (Untuk saat ini kita simpan sebagai teks, parsing akan lebih kompleks)
+                            # Di masa depan kita bisa gunakan library seperti 'dateparser' untuk mengubahnya
+                            
                             if username and text:
                                 Comment.objects.get_or_create(
                                     video=video,
                                     username=username,
                                     text=text,
-                                    defaults={'comment_url': comment_url}
+                                    comment_url=comment_url,
+                                    defaults={
+                                        'platform': 'YT', # <-- MENYIMPAN PLATFORM
+                                        # Untuk sementara, kita bisa isi comment_date dengan tanggal scrape
+                                        # Karena mengambil tanggal relatif ("3 days ago") butuh library tambahan
+                                        'comment_date': None 
+                                    }
                                 )
                                 saved_count += 1
                         except NoSuchElementException:
-                            continue # Lewati jika elemen tidak lengkap (misal, komentar terhapus)
+                            continue
                     
                     self.stdout.write(self.style.SUCCESS(f"   -> Berhasil menyimpan {saved_count} komentar baru."))
 

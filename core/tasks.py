@@ -11,7 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 
-from .models import Video
+from .models import Video, Comment
 
 @shared_task
 def scrape_youtube_videos_task(keyword, scroll_pages=2):
@@ -94,3 +94,71 @@ def scrape_youtube_videos_task(keyword, scroll_pages=2):
     finally:
         print("✅ Task selesai.")
         driver.quit()
+        
+@shared_task
+def scrape_youtube_comments_task(video_limit=5, scroll_count=3, max_comments_per_video=20):
+    """
+    Celery task untuk scrape komentar dari video yang ada di database.
+    """
+    print(f"🚀 Memulai Celery task untuk scraping komentar...")
+
+    videos_to_scrape = Video.objects.filter(comments__isnull=True)[:video_limit]
+    
+    if not videos_to_scrape:
+        print("👍 Semua video sudah memiliki komentar. Tidak ada pekerjaan.")
+        return "Semua video sudah memiliki komentar."
+
+    print(f"Menemukan {len(videos_to_scrape)} video untuk di-scrape komentarnya.")
+
+    options_config = webdriver.ChromeOptions()
+    options_config.add_argument("--headless")
+    options_config.add_argument("--log-level=3")
+    service = ChromeService(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options_config)
+
+    total_saved_comments = 0
+    try:
+        for video in videos_to_scrape:
+            print(f"--- Mengambil komentar untuk: '{video.title[:50]}...' ---")
+            driver.get(video.video_url)
+            try:
+                WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#comments")))
+                
+                for i in range(scroll_count):
+                    driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
+                    time.sleep(2)
+                
+                comment_elements = driver.find_elements(By.CSS_SELECTOR, "ytd-comment-thread-renderer")
+                
+                saved_count = 0
+                for element in comment_elements[:max_comments_per_video]:
+                    try:
+                        username = element.find_element(By.ID, "author-text").text
+                        text = element.find_element(By.ID, "content-text").text
+                        comment_url_element = element.find_element(By.CSS_SELECTOR, "a.yt-simple-endpoint")
+                        comment_url = comment_url_element.get_attribute('href')
+
+                        if username and text:
+                            Comment.objects.get_or_create(
+                                video=video,
+                                username=username,
+                                text=text,
+                                defaults={'comment_url': comment_url, 'platform': 'YT'}
+                            )
+                            saved_count += 1
+                    except NoSuchElementException:
+                        continue
+                
+                total_saved_comments += saved_count
+                print(f"   -> Berhasil menyimpan {saved_count} komentar baru.")
+            except TimeoutException:
+                print(f"   -> Gagal menemukan bagian komentar untuk video ini.")
+                continue
+    except Exception as e:
+        print(f"Terjadi error: {e}")
+        return f"Gagal menjalankan scraping komentar. Error: {e}"
+    finally:
+        driver.quit()
+        print("✅ Task komentar selesai.")
+    
+    return f"Proses selesai. Berhasil menyimpan total {total_saved_comments} komentar baru."

@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Video, Comment
 from .serializers import VideoSerializer, CommentSerializer
-from .tasks import scrape_youtube_videos_task
+from .tasks import scrape_youtube_videos_task, scrape_youtube_comments_task
 
 class VideoListAPIView(generics.ListAPIView):
     """
@@ -47,5 +47,18 @@ def start_youtube_scrape(request):
 
     return Response(
         {'status': 'success', 'message': f"Proses scraping untuk keyword '{keyword}' telah dimulai di latar belakang."},
+        status=status.HTTP_202_ACCEPTED
+    )
+
+@api_view(['POST'])
+def start_comment_scrape(request):
+    """
+    API endpoint untuk memulai proses scraping komentar YouTube.
+    """
+    # Memanggil task Celery untuk berjalan di latar belakang
+    scrape_youtube_comments_task.delay()
+
+    return Response(
+        {'status': 'success', 'message': "Proses update komentar telah dimulai di latar belakang."},
         status=status.HTTP_202_ACCEPTED
     )
